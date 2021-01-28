@@ -24,7 +24,10 @@
 
 #include "maxwell.h"
 
-#if defined(HAVE_LIBFFTW3) || defined(HAVE_LIBFFTW3F) || defined(HAVE_LIBFFTW3L)
+#if defined(HAVE_LIBCUFFTW)
+#  include <cufftw.h>
+#  define HAVE_FFTW3 1
+#elif defined(HAVE_LIBFFTW3) || defined(HAVE_LIBFFTW3F) || defined(HAVE_LIBFFTW3L)
 #  include <fftw3.h>
 #  ifdef HAVE_MPI
 #    include <fftw3-mpi.h>

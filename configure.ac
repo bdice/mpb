@@ -123,11 +123,16 @@ fi
 ##############################################################################
 AC_ARG_WITH(mpi, [AC_HELP_STRING([--with-mpi],[enable MPI parallelization])], with_mpi=$withval, with_mpi=no)
 AC_ARG_WITH(fftw2, [AC_HELP_STRING([--with-fftw2],[prefer FFTW2 to FFTW3])], with_fftw2=$withval, with_fftw2=no)
+AC_ARG_WITH(cufftw, [AC_HELP_STRING([--with-cufftw],[prefer cuFFTW to FFTW3])], with_cufftw=$withval, with_cufftw=no)
 
 # Check for FFTW libraries
 fftw3_func=execute
 test "x$with_fftw2" = xyes && fftw3_func=notarealfunction # prefer FFTW2
-if test "$enable_single" = "yes"; then
+test "x$with_cufftw" = xyes && fftw3_func=notarealfunction # prefer cuFFTW
+
+if test "x$with_cufftw" = xyes; then
+	AC_CHECK_LIB(cufftw, fftw_execute)
+elif test "$enable_single" = "yes"; then
         AC_CHECK_LIB(fftw3f, fftwf_$fftw3_func, [], [
 	AC_CHECK_LIB(sfftw, fftw)
 	if test x"$inv_sym" = xyes; then
@@ -154,13 +159,24 @@ if test x = x"`echo $LIBS | egrep 'l[[dsx]]fftw|fftw3'`"; then
 	fi
 fi
 
-if test x = x"`echo $LIBS | egrep 'l[[dsx]]*fftw'`"; then
-	AC_MSG_ERROR([The FFTW libraries could not be found.  Make sure FFTW is installed, and that LDFLAGS and CPPFLAGS are set appropriately if necessary.])
-fi
+echo "LIBS=$LIBS"
 
-if test x"$inv_sym" = xyes; then
-	if test x = x"`echo $LIBS | egrep 'l[[dsx]]*rfftw|lfftw3'`"; then
-		AC_MSG_ERROR([The FFTW3 or RFFTW libraries, which are required to compile MPB with inversion symmetry, could not be found.  These should have been installed as a part of FFTW.])
+if test "x$with_cufftw" = xyes; then
+	if test x = x"`echo $LIBS | egrep 'l[[dsx]]*cufft'`"; then
+		AC_MSG_ERROR([The cuFFT library could not be found.  Make sure cuFFT is installed, and that LDFLAGS and CPPFLAGS are set appropriately if necessary. Note that both -lcufft and -lcufftw must be specified.])
+	fi
+	if test x = x"`echo $LIBS | egrep 'l[[dsx]]*cufftw'`"; then
+		AC_MSG_ERROR([The cuFFTW library could not be found.  Make sure cuFFTW is installed, and that LDFLAGS and CPPFLAGS are set appropriately if necessary. Note that both -lcufft and -lcufftw must be specified.])
+	fi
+else
+	if test x = x"`echo $LIBS | egrep 'l[[dsx]]*fftw'`"; then
+		AC_MSG_ERROR([The FFTW libraries could not be found.  Make sure FFTW is installed, and that LDFLAGS and CPPFLAGS are set appropriately if necessary.])
+	fi
+
+	if test x"$inv_sym" = xyes; then
+		if test x = x"`echo $LIBS | egrep 'l[[dsx]]*rfftw|lfftw3'`"; then
+			AC_MSG_ERROR([The FFTW3 or RFFTW libraries, which are required to compile MPB with inversion symmetry, could not be found.  These should have been installed as a part of FFTW.])
+		fi
 	fi
 fi
 
@@ -169,6 +185,9 @@ fi
 
 AC_ARG_WITH(openmp, [AC_HELP_STRING([--with-openmp],[enable OpenMP parallelization])], with_omp=$withval, with_omp=no)
 if test "x$with_omp" = xyes; then
+	if test "x$with_cufftw" = "xyes"; then
+		AC_MSG_ERROR([cuFFTW and OpenMP cannot both be enabled.])
+	fi
    AC_DEFINE([USE_OPENMP], [1], [Define to use OpenMP threading.])
    AX_OPENMP([], [AC_MSG_ERROR([Could not find OpenMP flag; configure with --without-openmp])])
    CFLAGS="$CFLAGS $OPENMP_CFLAGS"
@@ -198,6 +217,9 @@ LIBS="$LAPACK_LIBS $BLAS_LIBS $LIBS $FLIBS"
 # Check for MPI library
 
 if test "x$with_mpi" = "xyes"; then
+	if test "x$with_cufftw" = "xyes"; then
+		AC_MSG_ERROR([cuFFTW and MPI cannot both be enabled.])
+	fi
 	AX_MPI([], [AC_MSG_ERROR(could not find mpi library for --with-mpi)])
         CC="$MPICC"
 	LIBS="$MPILIBS $LIBS"
